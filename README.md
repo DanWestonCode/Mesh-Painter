@@ -1,6 +1,6 @@
 ## Mesh Painter Scriptable Render Feature
-<a href="http://www.youtube.com/watch?feature=player_embedded&v=PoGv3ErdMvw
-" target="_blank"><img src="http://img.youtube.com/vi/PoGv3ErdMvw/0.jpg" 
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=xgQfsj-_xb4
+" target="_blank"><img src="http://img.youtube.com/vi/PxgQfsj-_xb4/0.jpg" 
 alt="Mesh Painter Demo  " width="480" height="360" border="10" /></a>
 
 ### Installation: 
@@ -15,6 +15,11 @@ The technique in this project works by creating a persistent render texture at r
 
 `PaintIntoTexture.Shader` unwraps a target mesh into the render texture, using the target mesh’s UV coordinates. Every pixel of the render texture corresponds to a point on the target mesh. Each pixel compares the mesh’s surface point’s world position to the passed mouse position, painting the brush colour when the pixel is within range of the input. 
 
+<img src="Documentation~/Resources/mesh_painter_uv_island.png"
+     alt="Mesh Painter UV Island"
+     width="75%"
+     height="75%">
+
 The render texture is only cleared upon creation/resizing so the output of the shader is blended into the existing content of the texture, accumulating the result. 
 
 The BlendPainting.shader’ finally composites the base texture of the mesh with the runtime paint texture.
@@ -28,7 +33,7 @@ The project comes with a sample demo project with a working example, open the De
 - Set the`renderPassEvent` to After Render Opaques.
 - Provide a material instance for `paintIntoTextureMaterial`, this material should use the `PaintIntoTexture.shader`.
 - During the runtime of your game, pass a `PaintEntityRenderData` instance to the `MeshPainterScriptableRenderFeature` instance. This should contain the MeshRenderer Transform and MeshFilter of the target you wish to pain 
-Pass a ‘BrushRenderData’ instance to control any of the brush settings 
+Pass a `BrushRenderData` instance to control any of the brush settings 
 
 ### TODOs:
 - Currently the Render Feature only supports painting of one context at a time. This should be easily solvable. Changing the Feature to contain a collection of `PaintEntityRenderData` instances and adapting the pass to create a Render Texture for each instance. This would naturally cause a linear increase in performance cost. 
