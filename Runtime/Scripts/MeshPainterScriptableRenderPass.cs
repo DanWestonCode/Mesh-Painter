@@ -46,11 +46,11 @@ namespace MeshPainter
 			profilingSampler = new ProfilingSampler(PROFILER_IDENT);
 		}
 
-		public void Setup(RenderPassEvent renderEvent, PaintEntityRenderData entityRenderData, BrushRenderData brushRenderData)
+		public void Setup(RenderPassEvent renderEvent, PaintEntityRenderData entityRenderData, BrushRenderData brushData)
 		{
 			renderPassEvent = renderEvent;
 			paintEntityRenderData = entityRenderData;
-			this.brushRenderData = brushRenderData;
+			brushRenderData = brushData;
 		}
 		
 		public void Dispose()
@@ -64,6 +64,7 @@ namespace MeshPainter
 			//	Create/recreate the texture which we're painting into
 			if (!EnsurePaintedTexture()) return;
 			TextureHandle paintedHandle = renderGraph.ImportTexture(paintedTexture);
+			if (brushRenderData.position.w <= 0) return;
 			//	Paint directly into our painting texture
 			PaintIntoTarget(renderGraph, paintedHandle);
 		}
