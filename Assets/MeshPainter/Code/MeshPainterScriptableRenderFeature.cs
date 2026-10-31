@@ -5,58 +5,58 @@ namespace MeshPainter
 {
 	public class MeshPainterScriptableRenderFeature : ScriptableRendererFeature
 	{
-		[SerializeField, Tooltip("When the Render Pass will be injected into the rendering process.")] 
-		private RenderPassEvent _renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+		[SerializeField, Tooltip("When the Render Pass will be injected into the rendering process.")]
+		private RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
 
-		[SerializeField] 
-		private MeshPainterRenderPassData _renderPassData;
+		[SerializeField] private MeshPainterRenderPassData renderPassData;
 		
-		// ----------------------------------------------------------------------------
-
-		private MeshPainterScriptableRenderPass _renderPass;
-		private PaintEntityRenderData _paintEntitiesRenderData;
-		
-		// ----------------------------------------------------------------------------
+		private MeshPainterScriptableRenderPass renderPass;
+			
+		private PaintEntityRenderData paintEntityRenderData;
+		private BrushRenderData brushRenderData;
 
 		/// <summary>
-		/// Initialize the Scriptable Render Pass attached to this feature
+		///		Initialize the Scriptable Render Pass attached to this feature
 		/// </summary>
 		public override void Create()
 		{
-			_renderPassData.Asserts();
-			_renderPass = new MeshPainterScriptableRenderPass(_renderPassData.UnwrapUVMaterial, 
-				_renderPassData.PaintUnwrappedUVMaterial);
+			renderPass?.Dispose();
+			renderPassData.Asserts();
+			renderPass = new MeshPainterScriptableRenderPass(renderPassData);
 		}
 
 		/// <summary>
-		/// Inject the Mesh Painter Scriptable Render Pass into the renderer
+		///		Inject the Mesh Painter Scriptable Render Pass into the renderer
 		/// </summary>
 		public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
 		{
-			if (!Application.isPlaying)
-			{
-				return;
-			}
-            
-			renderer.EnqueuePass(_renderPass);
-		}
-
-		public override void SetupRenderPasses(ScriptableRenderer renderer, in RenderingData renderingData)
-		{
-			Camera currentCamera = Camera.main;
-			if (null == currentCamera)
-			{
-				return;
-			}
-			_renderPass.Setup(_renderPassEvent, _paintEntitiesRenderData, renderer.cameraColorTargetHandle, currentCamera);
-		}
-
-		// ----------------------------------------------------------------------------
-
-		public void SetContext(in PaintEntityRenderData paintEntityRenderData)
-		{
-			_paintEntitiesRenderData = paintEntityRenderData;
+			//	Don't want this running in play mode...
+			if (!Application.isPlaying || renderPass == null) return;
+			
+			renderPass.Setup(renderPassEvent, 
+				paintEntityRenderData, 
+				brushRenderData);
+			renderer.EnqueuePass(renderPass);
 		}
 		
+		/// <summary>
+		///		Clean up resources
+		/// </summary>
+		protected override void Dispose(bool disposing)
+		{
+			if (!disposing) return;
+			renderPass?.Dispose();
+			renderPass = null;
+		}
+		
+		public void SetPaintEntityRenderData(PaintEntityRenderData context)
+		{
+			paintEntityRenderData = context;
+		}
+		
+		public void SetBrushRenderData(BrushRenderData context)
+		{
+			brushRenderData = context;
+		}
 	}
 }

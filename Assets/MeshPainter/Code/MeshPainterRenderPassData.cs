@@ -1,28 +1,20 @@
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace MeshPainter
 {
     [Serializable]
     public struct MeshPainterRenderPassData
     {
-        [SerializeField] private Material _unwrapUVMaterial;
-        [SerializeField] private Material _paintUnwrappedUVMaterial;
-
-        // ----------------------------------------------------------------------------
-
-        public Material UnwrapUVMaterial => _unwrapUVMaterial;
-        public Material PaintUnwrappedUVMaterial => _paintUnwrappedUVMaterial;
-
-        // ----------------------------------------------------------------------------
+        [field: SerializeField] public Material UnwrapUVMaterial { get; private set; }
+        [field: SerializeField] public Material PaintUnwrappedUVMaterial { get; private set; }
         
         public void Asserts()
         {
-            Debug.Assert(null != _unwrapUVMaterial,
-                "No MeshPainter Material has been assigned in MeshPainterRenderPassData");
-            Debug.Assert(null != _paintUnwrappedUVMaterial,
-                "No MeshPainter Material has been assigned in MeshPainterRenderPassData");
+            Debug.Assert(UnwrapUVMaterial != null,
+                "No MeshPainter UnwrapUVMaterial Material  has been assigned in MeshPainterRenderPassData");
+            Debug.Assert(PaintUnwrappedUVMaterial != null,
+                "No PaintUnwrappedUVMaterial MeshPainter Material has been assigned in MeshPainterRenderPassData");
         }
     }
-}
+}   

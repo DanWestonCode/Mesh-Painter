@@ -2,21 +2,20 @@ Shader "MeshPainter/UVUnwrap"
 {
 	SubShader
 	{
-		Tags { "RenderType"="Opaque" }
+		Tags { "RenderType"="Opaque" "RenderPipeline"="UniversalPipeline" }
 		LOD	 100
-		ZTest  Off
+		ZTest  Always
 		ZWrite Off
 		Cull   Off
 
 		Pass
 		{
-			CGPROGRAM
+			HLSLPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
 			
 			struct appdata
 			{
-				float4 vertex : POSITION;
 				float2 uv : TEXCOORD0;
 			};
 
@@ -32,9 +31,9 @@ Shader "MeshPainter/UVUnwrap"
 
 				float2 uv = v.uv;
 				// handle inverted v coords
-				#if UNITY_UV_STARTS_AT_TOP
+#if UNITY_UV_STARTS_AT_TOP
 				uv.y = 1. - uv.y;
-				#endif
+#endif
 
 				// Move UVs from 0/1 into -1/+1
 				uv = uv * 2-1.;
@@ -44,11 +43,11 @@ Shader "MeshPainter/UVUnwrap"
 				return o;
 			}
 
-			fixed4 frag (v2f i) : SV_Target
+			half4 frag (v2f i) : SV_Target
 			{
-				return float4 (0,0,0,1.0f);
+				return half4(0,0,0,0.0f);
 			}
-			ENDCG
+			ENDHLSL
 		}
 	}
 }

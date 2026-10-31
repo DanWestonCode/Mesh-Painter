@@ -1,179 +1,138 @@
-using UnityEngine;
-using UnityEngine.Rendering;
+using System;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.Rendering;
+using UnityEngine;
 
 namespace MeshPainter
 {
-	public class MeshPainterScriptableRenderPass : ScriptableRenderPass
+	public class MeshPainterScriptableRenderPass : ScriptableRenderPass, IDisposable
 	{
+		private const int TEX_SIZE = 2048;
 		private const string PROFILER_IDENT = "Mesh Painter Render Pass";
+		private const string PAINT_HANDLE_TEX_NAME = "_MeshPainterPaintedTexture";
 
-		// ----------------------------------------------------------------------------
-
-		private readonly int _unwrapedUVs = Shader.PropertyToID("_unwrapUVs");
-		private readonly int _mainTex = Shader.PropertyToID("_MainTex");
-		private readonly int  _tex = Shader.PropertyToID("_paintedTex");
-		private readonly int _brushOpacity = Shader.PropertyToID("_brushOpacity");
-		private readonly int _brushStrength = Shader.PropertyToID("_brushStrength");
-		private readonly int _brushSize = Shader.PropertyToID("_brushSize");
-		private readonly int _paintColour = Shader.PropertyToID("_paintColour");
-		private readonly int _objectToWorld = Shader.PropertyToID("_objectToWorld");
-		private readonly int _mousePosition = Shader.PropertyToID("_mousePosition");
-
-		private RTHandle unwrappedUVs;
+		//	Shader Properties...
+		private static readonly int mainTex = Shader.PropertyToID("_MainTex");
+		private static readonly int tex = Shader.PropertyToID("_paintedTex");
+		private static readonly int brushOpacity = Shader.PropertyToID("_brushOpacity");
+		private static readonly int brushStrength = Shader.PropertyToID("_brushStrength");
+		private static readonly int brushSize = Shader.PropertyToID("_brushSize");
+		private static readonly int paintColour = Shader.PropertyToID("_paintColour");
+		private static readonly int objectToWorld = Shader.PropertyToID("_objectToWorld");
+		private static readonly int mousePosition = Shader.PropertyToID("_mousePosition");
 		
-		// ----------------------------------------------------------------------------
-
-		private Material _unwrapUVMaterial;
-		private Material _paintUnwrappedUVSMaterial;
-		private PaintEntityRenderData _paintEntityRenderData;
-		private RenderTargetIdentifier _cameraColorTarget;
-		private RenderTexture _unwrappedUVRenderTexture;
-		private bool _hasGeneratedUnwrappedUVTexture = false;
-		private RaycastHit[] _raycastHits = new RaycastHit[1];
-		private Camera _camera;
-
-		// ----------------------------------------------------------------------------
+		private BrushRenderData brushRenderData;
+		private MeshPainterRenderPassData meshPainterRenderPassData;
+		private PaintEntityRenderData paintEntityRenderData;
+		private RTHandle paintedTexture;
 		
-		public MeshPainterScriptableRenderPass(Material unwrapUVMaterial, Material paintUnwrappedUvsMaterial)
+		private class PaintIntoTextureDrawPassData
 		{
-			_unwrapUVMaterial = unwrapUVMaterial;
-			_paintUnwrappedUVSMaterial = paintUnwrappedUvsMaterial;
+			public Color brushColor;
+			public Material Material;	
+			public Matrix4x4 ObjectToWorld;
+			public Mesh Mesh;
+			public Vector4 MousePosition;
+			public float brushOpacity;
+			public float brushSize;
+			public float brushStrength;
+		}
+		
+		public MeshPainterScriptableRenderPass(MeshPainterRenderPassData meshPainterRenderPassData)
+		{
+			this.meshPainterRenderPassData = meshPainterRenderPassData;
 			profilingSampler = new ProfilingSampler(PROFILER_IDENT);
 		}
-		
-		public void Setup(RenderPassEvent renderEvent,
-			PaintEntityRenderData paintEntityRenderData,
-			RenderTargetIdentifier cameraColorTarget,
-			Camera camera)
+
+		public void Setup(RenderPassEvent renderEvent, PaintEntityRenderData entityRenderData, BrushRenderData brushRenderData)
 		{
 			renderPassEvent = renderEvent;
-			_paintEntityRenderData = paintEntityRenderData;
-			_cameraColorTarget = cameraColorTarget;
-			_camera = camera;
+			paintEntityRenderData = entityRenderData;
+			this.brushRenderData = brushRenderData;
 		}
 		
-		// ----------------------------------------------------------------------------
-		
-		public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
+		public void Dispose()
 		{
-			int width = 2048;
-			int height = 2048;
+			paintedTexture?.Release();
+			paintedTexture = null;
+		}
+		
+		public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+		{
+			//	Create/recreate the texture which we're painting into
+			if (!EnsurePaintedTexture()) return;
+			TextureHandle paintedHandle = renderGraph.ImportTexture(paintedTexture);
+			//	Paint directly into our painting texture
+			PaintIntoTarget(renderGraph, paintedHandle);
+		}
+		
+		private bool EnsurePaintedTexture()
+		{
+			Renderer renderer = paintEntityRenderData.renderer;
+			Mesh mesh = paintEntityRenderData.meshFilter.sharedMesh;
+			if (renderer == null || mesh == null) return false;
 			
-			Texture texture = _paintEntityRenderData.Renderer.sharedMaterial.GetTexture(_mainTex);
-			if (null != texture)
+			int width = TEX_SIZE;
+			int height = TEX_SIZE;
+			Texture texture = renderer.sharedMaterial.GetTexture(mainTex);
+			if (texture != null)
 			{
 				width = texture.width;
 				height = texture.height;
 			}
-            
-			cmd.GetTemporaryRT(_unwrapedUVs, 
-				width, 
-				height, 
-				24,
-				FilterMode.Bilinear, 
-				RenderTextureFormat.ARGB32,
-				RenderTextureReadWrite.Default, 
-				Mathf.Max(1, QualitySettings.antiAliasing));
-
-			if (null == _unwrappedUVRenderTexture)
-			{
-				_unwrappedUVRenderTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32,
-					RenderTextureReadWrite.Default);
-			}
-		}
-
-		public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
-		{
-			CommandBuffer cmd = CommandBufferPool.Get();
-			using (new ProfilingScope(cmd, profilingSampler))
-			{
-				context.ExecuteCommandBuffer(cmd);
-				cmd.Clear();
-
-				SetGlobalShaderParameters(cmd);
-				GetMouseInput(cmd);
-				DrawMeshUVsUnwrapped(cmd);
-				PaintUnwrappedUVsTexture(cmd);
-
-				context.ExecuteCommandBuffer(cmd);
-			}
-
-			CommandBufferPool.Release(cmd);
-		}
-
-		// ----------------------------------------------------------------------------
-
-		private void SetGlobalShaderParameters(CommandBuffer commandBuffer)
-		{
-			commandBuffer.SetGlobalTexture(_tex, _unwrappedUVRenderTexture);
-			commandBuffer.SetGlobalFloat(_brushOpacity,1.0f);
-			commandBuffer.SetGlobalFloat(_brushStrength,1.0f );
-			commandBuffer.SetGlobalFloat(_brushSize,0.0315f );
-			commandBuffer.SetGlobalColor(_paintColour, Color.blue);
 			
-			Matrix4x4 localToWorldMatrix = _paintEntityRenderData.Transform.localToWorldMatrix;
-			commandBuffer.SetGlobalMatrix(_objectToWorld, localToWorldMatrix);
-			
-			_paintEntityRenderData.Renderer.sharedMaterial.SetTexture(_tex, _unwrappedUVRenderTexture);
-		}
-
-		private void GetMouseInput(CommandBuffer commandBuffer)
-		{
-			Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
-			Vector4 mouseHitPosition = ray.origin;//.positiveInfinity;
-
-			if (Physics.RaycastNonAlloc(ray, _raycastHits) > 0)
+			//	Do we need to recreate the RT which we paint into? 
+			if (paintedTexture != null && paintedTexture.rt != null &&
+			    paintedTexture.rt.width == width && paintedTexture.rt.height == height)
 			{
-				RaycastHit raycastHit = _raycastHits[0];
-				
-				if (!raycastHit.transform.TryGetComponent(out PaintEntity paintEntity))
-				{
-					return;
-				}
-				
-				mouseHitPosition = raycastHit.point;
-				
-				Debug.DrawLine(ray.origin, raycastHit.point, Color.green);
+				//	Painted Texture is still valid, carry on painting!
+				return true;
 			}
 			
-
-			mouseHitPosition.w = Input.GetMouseButton(0)? 1 : 0;
-			commandBuffer.SetGlobalVector(_mousePosition,  mouseHitPosition);
+			//	Need to recreate the texture...
+			paintedTexture?.Release();
+			paintedTexture = RTHandles.Alloc(width, height,
+				colorFormat: GraphicsFormat.R8G8B8A8_SRGB,
+				filterMode: FilterMode.Bilinear,
+				wrapMode: TextureWrapMode.Clamp,
+				name: PAINT_HANDLE_TEX_NAME);
+			
+			//	Let everyone know about the new Texture we're painting into
+			Shader.SetGlobalTexture(tex, paintedTexture.rt);
+			paintEntityRenderData.renderer.sharedMaterial.SetTexture(tex, paintedTexture.rt);
+			return true;
 		}
 
-		private void DrawMeshUVsUnwrapped(CommandBuffer commandBuffer)
+		private void PaintIntoTarget(RenderGraph renderGraph, TextureHandle paintedHandle)
 		{
-			if (_hasGeneratedUnwrappedUVTexture)
+			using IRasterRenderGraphBuilder builder = renderGraph.AddRasterRenderPass("Paint into texture", out PaintIntoTextureDrawPassData passData);
+			passData.Mesh = paintEntityRenderData.meshFilter.sharedMesh;
+			passData.Material = meshPainterRenderPassData.PaintUnwrappedUVMaterial;
+			passData.ObjectToWorld = paintEntityRenderData.transform.localToWorldMatrix;;
+			passData.MousePosition = brushRenderData.position;
+			passData.brushColor = brushRenderData.color;
+			passData.brushSize = brushRenderData.brushSize;
+			passData.brushOpacity = brushRenderData.brushOpacity;
+			passData.brushStrength = brushRenderData.brushStrength;
+			
+			builder.SetRenderAttachment(paintedHandle, 0);
+			//	AllowGlobalStateModification is set to true so SetGlobalXYZ will work on the RasterCommandBuffer
+			builder.AllowGlobalStateModification(true); 
+			builder.SetRenderFunc(static (PaintIntoTextureDrawPassData data, RasterGraphContext context) =>
 			{
-				return;
-			}
-			_hasGeneratedUnwrappedUVTexture = true;
+				RasterCommandBuffer cmd = context.cmd;
+
+				cmd.SetGlobalFloat(brushOpacity, data.brushOpacity);
+				cmd.SetGlobalFloat(brushStrength, data.brushStrength);
+				cmd.SetGlobalFloat(brushSize, data.brushSize);
+				cmd.SetGlobalColor(paintColour, data.brushColor);
+				cmd.SetGlobalMatrix(objectToWorld, data.ObjectToWorld);
+				cmd.SetGlobalVector(mousePosition, data.MousePosition);
 			
-			CoreUtils.SetRenderTarget(commandBuffer, _unwrappedUVRenderTexture, ClearFlag.All, Color.clear);
-			commandBuffer.ClearRenderTarget(true, true, Color.clear);
-			
-			Renderer renderer = _paintEntityRenderData.Renderer;
-			if (null == renderer)
-			{
-				return;
-			}
-			
-			commandBuffer.DrawMesh(_paintEntityRenderData.Mesh, Matrix4x4.identity, _unwrapUVMaterial);
-			CoreUtils.SetRenderTarget(commandBuffer, _cameraColorTarget);
+				cmd.DrawMesh(data.Mesh, Matrix4x4.identity, data.Material);
+			});
 		}
-
-		private void PaintUnwrappedUVsTexture(CommandBuffer commandBuffer)
-		{
-			CoreUtils.SetRenderTarget(commandBuffer, _unwrapedUVs, ClearFlag.All, Color.clear);
-			commandBuffer.ClearRenderTarget(true, true, Color.clear);
-
-			commandBuffer.DrawMesh(_paintEntityRenderData.Mesh, Matrix4x4.identity, _paintUnwrappedUVSMaterial);
-			commandBuffer.Blit(_unwrapedUVs, _unwrappedUVRenderTexture);
-
-			CoreUtils.SetRenderTarget(commandBuffer, _cameraColorTarget);
-		}
-        
-		// ----------------------------------------------------------------------------
-    }
+	}
 }
