@@ -14,7 +14,7 @@ Adapted from [Dynamic Mesh Painting in Unreal Engine 4](https://www.kodeco.com/6
 ## Licence
 MIT License
 
-Copyright (c) 2024 Daniel Weston
+Copyright (c) 2026 Daniel Weston
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
