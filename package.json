@@ -1,0 +1,21 @@
+{
+  "name": "com.danwestoncode.meshpainter",
+  "version": "1.0.1",
+  "displayName": "Mesh Painter",
+  "description": "",
+  "unity": "6000.3",
+  "unityRelease": "23f1",
+  "dependencies": {},
+  "author": {
+    "name": "Daniel Weston",
+    "email": "westondaniel@protonmail.com",
+    "url": "https://danwestoncode.github.io/"
+  },
+  "samples": [
+    {
+      "displayName": "Mesh Painter Demo",
+      "description": "Sample for how to use Mesh Painter",
+      "path": "Samples~/Demo"
+    }
+  ]
+}
