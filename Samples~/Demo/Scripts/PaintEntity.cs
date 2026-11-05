@@ -1,7 +1,11 @@
 using System.Collections.Generic;
-using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
+using UnityEngine;
+
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace MeshPainter
 {
@@ -88,7 +92,9 @@ namespace MeshPainter
 
 		private void RotateEntity()
 		{
+#if ENABLE_LEGACY_INPUT_MANAGER
 			Vector3 axis = Vector3.zero;
+			
 			if(Input.GetKey(KeyCode.Q))
 			{
 				axis.y = 1;
@@ -107,14 +113,25 @@ namespace MeshPainter
 				axis.x = 1; 
 			}
 			transform.Rotate(axis * (rotationSpeed * Time.deltaTime));
+#endif
 		}
 
 		private void ProcessMouseInput(out Vector4 mouse)
 		{
 			mouse = Vector4.zero;
+			Vector3 rayPosition = Vector3.zero;
+			
+#if ENABLE_LEGACY_INPUT_MANAGER
 			//	Is the user attempting to paint?
-			if (!Input.GetMouseButton(0)) return; 
-			Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+			if (!Input.GetMouseButton(0)) return;
+			rayPosition = Input.mousePosition;
+#elif ENABLE_INPUT_SYSTEM
+			if (!Mouse.current.leftButton.isPressed) return;
+			rayPosition = Mouse.current.position.value;
+#else
+			return;
+#endif
+			Ray ray = mainCamera.ScreenPointToRay(rayPosition);
 
 			//	Is the user casting the mouse over this instance?
 			if (!Physics.Raycast(ray, out RaycastHit raycastHit)
