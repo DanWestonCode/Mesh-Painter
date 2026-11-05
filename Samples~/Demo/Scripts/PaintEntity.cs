@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UniColorPicker;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
@@ -22,7 +21,6 @@ namespace MeshPainter
 		private MeshPainterScriptableRenderFeature scriptableRenderFeature;
 		private Camera mainCamera;
 		private Vector4 lastMouse;
-		
 		
 		private void Awake()
 		{
