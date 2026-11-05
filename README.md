@@ -22,13 +22,17 @@ The technique in this project works by creating a persistent render texture at r
      height="75%">
 
 ## How to use:
-The project comes with a sample demo project with a working example, open the Demo scene and inspect the `PaintEntity` script.
 
-- Add  `MeshPainterScriptableRenderFeature` to the Universal Renderer Data`.
+- Add `MeshPainterScriptableRenderFeature` to the Universal Renderer Data`.
 - Set the`renderPassEvent` to After Render Opaques.
 - Provide a material instance for `paintIntoTextureMaterial`, this material should use the `PaintIntoTexture.shader`.
-- During the runtime of your game, pass a `PaintEntityRenderData` instance to the `MeshPainterScriptableRenderFeature` instance. This should contain the MeshRenderer Transform and MeshFilter of the target you wish to paint 
-- Pass a `BrushRenderData` instance to control any of the brush settings 
+- During the runtime of your game, pass a `PaintEntityRenderData` instance to the `MeshPainterScriptableRenderFeature` instance. This should contain the MeshRenderer Transform and MeshFilter of the target you wish to paint. 
+- Pass a `BrushRenderData` instance to control any of the brush settings. 
+- Your context object will need to blend the results of the Mesh Painter (`_paintedTex`), you can use the `BlendPainting.shader` as an example (see Samples/Demo).
+
+The project comes with a sample demo project, open the Demo scene and inspect the `PaintEntity` script for an understanding of how to interact with the Scriptable Render Feature.
+
+![alt text](Documentation~/Resources/scriptable_render_feature.png "Scriptable Render Feature")
 
 ## Remarks/TODOs:
 - Currently the Render Feature only supports painting of one context at a time. This should be easily solvable. Changing the Feature to contain a collection of `PaintEntityRenderData` instances and adapting the pass to create a Render Texture for each instance. This would naturally cause a linear increase in performance cost. 
